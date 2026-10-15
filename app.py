@@ -6,6 +6,12 @@ import streamlit as st
 
 DB = Path(__file__).with_name('jobs.db')
 STATES = ('Pending Review', 'Approved', 'Rejected', 'Saved for Later')
+MIN_SALARY_LPA = 10
+PREFERRED_SALARY_RANGE = '₹10–20 LPA'
+DAILY_REVIEW_TARGET = 10
+TARGET_ROLES = ('Dynamics 365 CRM Developer', 'D365 Technical Consultant', 'Senior D365 CE Consultant', 'Power Platform Developer')
+PROFILE_LOCATION = 'India — remote, hybrid, or onsite'
+RESUME_SOURCE = '5Power Platform_YATISH MAHAJAN_CRM.pdf (uploaded by user; verify extracted facts before applying)'
 
 def connect():
     con = sqlite3.connect(DB)
@@ -90,6 +96,16 @@ else:
 st.title('📋 Job Application Agent')
 st.caption('Mobile-friendly review queue · Approval NEVER submits an application.')
 
+with st.expander('🎯 Your job-search settings', expanded=True):
+    c1, c2, c3 = st.columns(3)
+    c1.metric('Minimum package', f'₹{MIN_SALARY_LPA} LPA+')
+    c2.metric('Preferred range', PREFERRED_SALARY_RANGE)
+    c3.metric('Daily review target', f'{DAILY_REVIEW_TARGET} jobs')
+    st.write('**Target roles:** ' + ' · '.join(TARGET_ROLES))
+    st.write('**Location eligibility:** ' + PROFILE_LOCATION)
+    st.caption('Resume source: ' + RESUME_SOURCE)
+    st.warning('These are matching preferences only. This version does not yet search job websites or parse the PDF automatically. Verify salary, location eligibility, and resume facts for every job.')
+
 with st.sidebar:
     st.header('Add a job')
     st.caption('Add a listing to review. Matching scores are entered manually in this version.')
@@ -114,6 +130,10 @@ with st.sidebar:
 
 with connect() as con:
     rows=[dict(x) for x in con.execute('SELECT * FROM jobs ORDER BY match_score DESC, created_at DESC').fetchall()]
+    today = datetime.now(timezone.utc).date().isoformat()
+    reviewed_today = con.execute('SELECT COUNT(DISTINCT job_id) FROM status_history WHERE substr(changed_at,1,10)=?', (today,)).fetchone()[0]
+
+st.progress(min(reviewed_today / DAILY_REVIEW_TARGET, 1.0), text=f'Daily review target: {reviewed_today}/{DAILY_REVIEW_TARGET} jobs with a status change today (UTC)')
 
 cols=st.columns(4)
 for col,status in zip(cols,STATES):
@@ -159,3 +179,4 @@ if rows:
 st.divider()
 st.info('Approved means reviewed and approved for manual application only. This app has no application submission, website scraping, browser automation, or external API calls.')
 st.caption('Cloud note: Streamlit Community Cloud does not guarantee local SQLite file persistence. Use an external persistent database before relying on this as your only tracker.')
+st.caption('Search specification: minimum ₹10 LPA; preferred ₹10–20 LPA; India-eligible roles; prioritize D365 CRM and Power Platform titles. Unknown salaries should be flagged for verification, not assumed to meet the minimum.')
